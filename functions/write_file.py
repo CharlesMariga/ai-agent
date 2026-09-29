@@ -1,5 +1,8 @@
 import os
 
+from openai.types.chat import ChatCompletionFunctionToolParam
+
+
 def write_file(working_directory: str, file_path: str, content: str) -> str:
     try:
         working_dir_abs = os.path.abspath(working_directory)
@@ -12,7 +15,7 @@ def write_file(working_directory: str, file_path: str, content: str) -> str:
         if os.path.isdir(target_file):
             return f'Error: Cannot write to "{file_path}" as it is a directory'
         
-        os.makedirs(file_path, exist_ok=True)
+        os.makedirs(os.path.dirname(target_file), exist_ok=True)
         
         with open(target_file, "w") as f:
             f.write(content)
@@ -20,3 +23,26 @@ def write_file(working_directory: str, file_path: str, content: str) -> str:
         return f'Successfully wrote to "{file_path}" ({len(content)} characters written)'
     except Exception as e:
         return f"Error: {e}"
+
+
+schema_write_file: ChatCompletionFunctionToolParam = {
+    "type": "function",
+    "function": {
+        "name": "write_file",
+        "description": "Writes content to a specified file relative to the working directory, creating the file if it does not exist and overwriting it if it does",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "Path to the file to write, relative to the working directory",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Content to write to the file",
+                },
+            },
+            "required": ["file_path", "content"],
+        },
+    },
+}
