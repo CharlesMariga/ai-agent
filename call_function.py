@@ -45,10 +45,15 @@ def call_function(
             "content": f"Error: Unknown function: {function_name}",
         }
 
+    try:
+        content = function_map[function_name](
+            working_directory="./calculator", **function_args
+        )
+    except TypeError as e:
+        content = f"Error: Invalid arguments for {function_name}: {e}"
+
     return {
         "role": "tool",
         "tool_call_id": tool_call.id,
-        "content": function_map[function_name](
-            working_directory="./calculator", **function_args
-        ),
+        "content": content,
     }

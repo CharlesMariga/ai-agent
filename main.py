@@ -1,10 +1,12 @@
 import os
 import argparse
-import json
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import (
+    ChatCompletionAssistantMessageParam,
+    ChatCompletionMessageParam,
+)
 from prompts import system_prompt
 from call_function import available_functions, call_function
 
@@ -31,12 +33,20 @@ def main():
     if args.verbose:
         print(f"User prompt: {args.user_prompt}")
 
-    generate_content(client=client, messages=messages, verbose=args.verbose)
+    for _ in range(20):
+        message = generate_content(
+            client=client, messages=messages, verbose=args.verbose
+        )
+        if message:
+            print(message)
+            return
+
+    raise Exception("number of iterations exceeded")
 
 
 def generate_content(
     client: OpenAI, messages: list[ChatCompletionMessageParam], verbose: bool
-) -> None:
+) -> str | None:
     response = client.chat.completions.create(
         model="openrouter/free",
         messages=messages,
@@ -55,6 +65,24 @@ def generate_content(
     print(response.choices[0].message.content)
 
     message = response.choices[0].message
+    assistant_message: ChatCompletionAssistantMessageParam = {
+        "role": "assistant",
+        "content": message.content,
+    }
+    if message.tool_calls:
+        assistant_message["tool_calls"] = [
+            {
+                "id": tool_call.id,
+                "type": "function",
+                "function": {
+                    "name": tool_call.function.name,
+                    "arguments": tool_call.function.arguments,
+                },
+            }
+            for tool_call in message.tool_calls
+            if tool_call.type == "function"
+        ]
+    messages.append(assistant_message)
 
     if message.tool_calls is not None:
         for tool_call in message.tool_calls:
@@ -62,14 +90,17 @@ def generate_content(
                 continue
 
             result_message = call_function(tool_call=tool_call, verbose=verbose)
+            messages.append(result_message)
 
             if not result_message.get("content"):
                 raise Exception("")
 
             if verbose:
                 print(f"-> {result_message['content']}")
+        return None
     else:
         print(message)
+        return message.content
 
 
 if __name__ == "__main__":
